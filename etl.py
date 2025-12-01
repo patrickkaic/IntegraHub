@@ -4,29 +4,7 @@ import requests
 # ================================
 # API 1 — DESEMPREGO (IBGE)
 # ================================
-def fetch_desemprego_ibge():
-    url = "https://servicodados.ibge.gov.br/api/v3/agregados/4099/periodos/201901-202401/variaveis/4099"
-    r = requests.get(url)
 
-    if r.status_code != 200:
-        raise Exception("Erro ao consultar API de desemprego do IBGE")
-
-    data = r.json()[0]["resultados"][0]["series"]
-
-    rows = []
-    for serie in data:
-        regiao = serie["localidade"]["nome"]
-        for periodo, valor in serie["serie"].items():
-            ano = int(periodo[:4])
-            taxa = float(valor.replace(",", ".")) if valor else None
-            rows.append({
-                "tipo": "desemprego",
-                "ano": ano,
-                "regiao": regiao,
-                "valor": taxa
-            })
-
-    return pd.DataFrame(rows)
 
 
 # ================================
@@ -88,15 +66,14 @@ def fetch_investimentos_siconfi():
 # FUNÇÃO FINAL — UNIFICAÇÃO DO ETL
 # ================================
 def run_etl():
-    print("🔄 Executando ETL com 3 APIs reais...")
+    print("🔄 Executando ETL com 2 APIs reais...")
 
-    df_desemprego = fetch_desemprego_ibge()
     df_saude = fetch_saude_estabelecimentos()
     df_invest = fetch_investimentos_siconfi()
 
     # Junta tudo em um dataframe só
     df_final = pd.concat(
-        [df_desemprego, df_saude, df_invest],
+        [df_saude, df_invest],
         ignore_index=True
     )
 
