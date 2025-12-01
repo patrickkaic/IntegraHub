@@ -7,7 +7,7 @@ from etl import run_etl
 from charts import chart_desemprego
 
 st.set_page_config(page_title="IntegraHub", layout="wide")
-st.title("📊 IntegraHub – MVP 24h")
+st.title("IntegraHub")
 
 # Inicializa banco
 init_db()
