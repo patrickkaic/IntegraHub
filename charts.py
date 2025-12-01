@@ -10,8 +10,7 @@ def chart_desemprego(df: pd.DataFrame):
         y="valor",
         color="regiao",
         markers=True,
-        title="📉 Taxa de Desemprego por Região",
-        labels={"valor": "%", "ano": "Ano", "regiao": "Região"}
+        title="Unemployment Trend"
     )
     fig.update_layout(template="plotly_white")
     return fig
@@ -25,8 +24,7 @@ def chart_saude(df: pd.DataFrame):
         x="regiao",
         y="valor",
         color="regiao",
-        title="🏥 Estabelecimentos de Saúde por Região",
-        labels={"valor": "Quantidade", "regiao": "Região"}
+        title="Regional Unemployment"
     )
     fig.update_layout(template="plotly_white", showlegend=False)
     return fig
@@ -35,14 +33,12 @@ def chart_saude(df: pd.DataFrame):
 def chart_investimentos(df: pd.DataFrame):
     df = df[df["tipo"] == "investimentos"]
 
-    fig = px.bar(
+    fig = px.line(
         df,
-        y="regiao",
-        x="valor",
-        orientation="h",
-        color="regiao",
-        title="💰 Investimentos Públicos por Região (Bilhões)",
-        labels={"valor": "Investimento (bi)", "regiao": "Região"}
+        x="regiao",
+        y="valor",
+        markers=True,
+        title="Prediction"
     )
-    fig.update_layout(template="plotly_white", showlegend=False)
+    fig.update_layout(template="plotly_white")
     return fig

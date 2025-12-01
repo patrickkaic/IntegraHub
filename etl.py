@@ -50,7 +50,5 @@ def run_etl():
     df1 = fetch_desemprego_generico()
     df2 = fetch_saude_generico()
     df3 = fetch_investimentos_generico()
-
     df_final = pd.concat([df1, df2, df3], ignore_index=True)
-
     return df_final

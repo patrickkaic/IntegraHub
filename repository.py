@@ -1,3 +1,3 @@
 def insert_dataframe(df):
-    # Banco de dados desativado no protótipo
+    # Database disabled for prototype mode
     return True
