@@ -1,40 +1,26 @@
 import streamlit as st
-import pandas as pd
-
-from database import init_db
-from repository import insert_dataframe, get_all
 from etl import run_etl
-from charts import chart_desemprego
+import charts
 
-st.set_page_config(page_title="IntegraHub", layout="wide")
-st.title("IntegraHub")
+st.title("IntegraHub - Dashboard (Protótipo)")
+st.write("Visualização de dados genéricos para demonstração.")
 
-# Inicializa banco
-init_db()
+# Carrega dados
+df = run_etl()
+st.success("Dados carregados (modo protótipo com dados genéricos).")
 
-col1, col2 = st.columns([1, 2])
+st.subheader("Visualização por Indicador")
 
-with col1:
-    st.header("⚙️ Controle")
-    if st.button("Rodar ETL (IBGE Mock)"):
-        df = run_etl()
-        insert_dataframe(df)
-        st.success("ETL executado com sucesso!")
+tipo = st.selectbox(
+    "Selecione o indicador:",
+    ["desemprego", "saude", "investimentos"]
+)
 
-with col2:
-    st.header("📌 Dados Coletados")
-    data = get_all()
-    df = pd.DataFrame(data)
+if tipo == "desemprego":
+    st.plotly_chart(charts.chart_desemprego(df), use_container_width=True)
 
-    if df.empty:
-        st.warning("Nenhum dado carregado. Execute o ETL.")
-    else:
-        st.dataframe(df, use_container_width=True)
+elif tipo == "saude":
+    st.plotly_chart(charts.chart_saude(df), use_container_width=True)
 
-st.divider()
-
-if not df.empty:
-    st.header("📈 Visualização")
-    chart = chart_desemprego(df)
-    st.plotly_chart(chart, use_container_width=True)
-
+elif tipo == "investimentos":
+    st.plotly_chart(charts.chart_investimentos(df), use_container_width=True)

@@ -46,14 +46,11 @@ def fetch_investimentos_generico():
     return df
 
 
-# 🚀 ETL final — junta tudo
 def run_etl():
     df1 = fetch_desemprego_generico()
     df2 = fetch_saude_generico()
     df3 = fetch_investimentos_generico()
 
     df_final = pd.concat([df1, df2, df3], ignore_index=True)
-
-    print("✔ ETL (dados genéricos) carregado:", len(df_final), "registros")
 
     return df_final
