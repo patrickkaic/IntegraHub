@@ -9,7 +9,7 @@ import streamlit as st
 
 def safe_get(url):
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(url, timeout=20)
         r.raise_for_status()
         return r.json()
     except Exception as e:
@@ -18,35 +18,55 @@ def safe_get(url):
 
 
 # ============================================================
-# FUNÇÃO GERAL PARA BUSCAR QUALQUER INDICADOR GLOBAL
+# BUSCA GLOBAL COM PAGINAÇÃO (WORLD BANK)
 # ============================================================
 
 def fetch_global_indicator(indicator: str, tipo: str):
-    """
-    Busca um indicador da API global do World Bank
-    para TODOS os países, sem token.
-    """
-    url = f"https://api.worldbank.org/v2/country/all/indicator/{indicator}?downloadformat=json&format=json&per_page=60000"
-
-    data = safe_get(url)
-    if not data or len(data) < 2:
-        return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
-
     rows = []
-    for item in data[1]:
-        if item["value"] is None:
-            continue
+    page = 1
 
-        # Filtra somente países (elimina "WLD", "ECS", etc.)
-        if item["country"]["id"] in ["WLD", "OED", "HIC", "MIC", "LIC"]:
-            continue
+    while True:
+        url = (
+            f"https://api.worldbank.org/v2/country/all/indicator/{indicator}"
+            f"?format=json&page={page}&per_page=1000"
+        )
 
-        rows.append({
-            "ano": int(item["date"]),
-            "regiao": item["country"]["value"],   # nome do país
-            "valor": float(item["value"]),
-            "tipo": tipo
-        })
+        data = safe_get(url)
+        if not data or len(data) < 2:
+            break
+
+        meta = data[0]
+        values = data[1]
+
+        for item in values:
+            if item["value"] is None:
+                continue
+
+            country = item["country"]["id"]
+            name = item["country"]["value"]
+
+            # remover regiões agregadas
+            if country in ["WLD", "OED", "HIC", "MIC", "LIC", "ECS", "EAS", "LCN"]:
+                continue
+
+            # converter ano com segurança
+            try:
+                ano = int(str(item["date"]).strip()[:4])
+            except:
+                continue
+
+            rows.append({
+                "ano": ano,
+                "regiao": name,
+                "valor": float(item["value"]),
+                "tipo": tipo
+            })
+
+        # parar quando não há mais páginas
+        if page >= meta.get("pages", 1):
+            break
+
+        page += 1
 
     return pd.DataFrame(rows)
 
@@ -59,19 +79,16 @@ def fetch_global_indicator(indicator: str, tipo: str):
 def run_etl():
     st.info("🌍 Coletando dados globais (World Bank)...")
 
-    # DESMPREGO
     df_desemp = fetch_global_indicator(
         indicator="SL.UEM.TOTL.ZS",
         tipo="desemprego_global"
     )
 
-    # SAÚDE
     df_saude = fetch_global_indicator(
         indicator="SH.XPD.CHEX.GD.ZS",
         tipo="saude_global"
     )
 
-    # INVESTIMENTOS
     df_invest = fetch_global_indicator(
         indicator="NE.GDI.TOTL.ZS",
         tipo="investimento_global"

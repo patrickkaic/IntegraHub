@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from etl import run_etl
 import charts
 
@@ -62,11 +63,10 @@ st.markdown("""
 df = run_etl()
 
 # Lista dinâmica de países
-paises = sorted(df["regiao"].unique())
+paises = sorted(df["regiao"].unique()) if not df.empty else []
 paises = ["Todos"] + paises
 
-col1 = st.columns(1)[0]
-selected_country = col1.selectbox("Selecione um país:", paises)
+selected_country = st.selectbox("Selecione um país:", paises)
 
 if selected_country != "Todos":
     df_filtered = df[df["regiao"] == selected_country]
@@ -144,8 +144,20 @@ with c3:
 
 st.markdown("## 🌍 Ranking Global por Ano")
 
-ano_min = int(df["ano"].min())
-ano_max = int(df["ano"].max())
+# 🔥 PATCH DE SEGURANÇA — impede crash se ano vier vazio
+if df.empty or "ano" not in df.columns or df["ano"].dropna().empty:
+    st.error("Nenhum dado disponível para montar o ranking. Verifique se as APIs retornaram dados.")
+    st.stop()
+
+ano_min_real = df["ano"].dropna().min()
+ano_max_real = df["ano"].dropna().max()
+
+if pd.isna(ano_min_real) or pd.isna(ano_max_real):
+    st.error("Os dados carregados não possuem anos válidos.")
+    st.stop()
+
+ano_min = int(ano_min_real)
+ano_max = int(ano_max_real)
 
 selected_year = st.slider("Selecione um ano:", ano_min, ano_max, ano_max)
 
