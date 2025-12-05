@@ -1,16 +1,15 @@
 import pandas as pd
 import requests
 import streamlit as st
-from datetime import datetime
 
 
 # ============================================================
-# SAFE REQUEST
+# HELPER: REQUEST SEGURO
 # ============================================================
 
-def safe_get(url, params=None):
+def safe_get(url):
     try:
-        r = requests.get(url, params=params, timeout=15)
+        r = requests.get(url, timeout=15)
         r.raise_for_status()
         return r.json()
     except Exception as e:
@@ -19,29 +18,32 @@ def safe_get(url, params=None):
 
 
 # ============================================================
-# 1) WORLD BANK — ECONOMIA REAL
-# PIB, desemprego e população
+# FUNÇÃO GERAL PARA BUSCAR QUALQUER INDICADOR GLOBAL
 # ============================================================
 
-def fetch_worldbank_indicator(country: str, indicator: str, tipo: str):
+def fetch_global_indicator(indicator: str, tipo: str):
     """
-    country = 'BRA'
-    indicator = códigos World Bank (ex: SL.UEM.TOTL.ZS)
-    tipo = nome do indicador no dataframe final
+    Busca um indicador da API global do World Bank
+    para TODOS os países, sem token.
     """
-    url = f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}?format=json"
+    url = f"https://api.worldbank.org/v2/country/all/indicator/{indicator}?downloadformat=json&format=json&per_page=60000"
 
     data = safe_get(url)
     if not data or len(data) < 2:
         return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
 
     rows = []
-    for item in data[1]:  
+    for item in data[1]:
         if item["value"] is None:
             continue
+
+        # Filtra somente países (elimina "WLD", "ECS", etc.)
+        if item["country"]["id"] in ["WLD", "OED", "HIC", "MIC", "LIC"]:
+            continue
+
         rows.append({
             "ano": int(item["date"]),
-            "regiao": country,
+            "regiao": item["country"]["value"],   # nome do país
             "valor": float(item["value"]),
             "tipo": tipo
         })
@@ -49,89 +51,35 @@ def fetch_worldbank_indicator(country: str, indicator: str, tipo: str):
     return pd.DataFrame(rows)
 
 
-def fetch_economia_worldbank():
-    df1 = fetch_worldbank_indicator("BRA", "NY.GDP.MKTP.CD", "pib")
-    df2 = fetch_worldbank_indicator("BRA", "SL.UEM.TOTL.ZS", "desemprego")
-    df3 = fetch_worldbank_indicator("BRA", "SP.POP.TOTL", "populacao")
-    return pd.concat([df1, df2, df3], ignore_index=True)
-
-
 # ============================================================
-# 2) OPEN-METEO — CLIMA REAL
-# Temperatura média diária em SP
+# ETL FINAL: desemprego, saúde e investimentos globais
 # ============================================================
 
-def fetch_clima_openmeteo():
-    url = (
-        "https://api.open-meteo.com/v1/forecast"
-        "?latitude=-23.55&longitude=-46.63"
-        "&daily=temperature_2m_max,temperature_2m_min"
-        "&timezone=America%2FSao_Paulo"
+@st.cache_data(ttl=3660)
+def run_etl():
+    st.info("🌍 Coletando dados globais (World Bank)...")
+
+    # DESMPREGO
+    df_desemp = fetch_global_indicator(
+        indicator="SL.UEM.TOTL.ZS",
+        tipo="desemprego_global"
     )
 
-    data = safe_get(url)
-    if not data:
-        return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
+    # SAÚDE
+    df_saude = fetch_global_indicator(
+        indicator="SH.XPD.CHEX.GD.ZS",
+        tipo="saude_global"
+    )
 
-    datas = data["daily"]["time"]
-    temp_max = data["daily"]["temperature_2m_max"]
+    # INVESTIMENTOS
+    df_invest = fetch_global_indicator(
+        indicator="NE.GDI.TOTL.ZS",
+        tipo="investimento_global"
+    )
 
-    rows = []
-    for d, t in zip(datas, temp_max):
-        ano = int(d.split("-")[0])
-        rows.append({
-            "ano": ano,
-            "regiao": "SP",
-            "valor": float(t),
-            "tipo": "temperatura_max"
-        })
+    df = pd.concat([df_desemp, df_saude, df_invest], ignore_index=True)
+    df = df.sort_values("ano")
 
-    return pd.DataFrame(rows)
+    st.success("✔ Dados globais carregados com sucesso!")
 
-
-# ============================================================
-# 3) FIPEAPI — Veículos
-# Marcas de carros e quantidade
-# ============================================================
-
-def fetch_fipe_marcas():
-    url = "https://parallelum.com.br/fipe/api/v1/carros/marcas"
-    data = safe_get(url)
-
-    if not data:
-        return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
-
-    ano_atual = datetime.now().year
-
-    rows = []
-    for item in data:
-        rows.append({
-            "ano": ano_atual,
-            "regiao": "Brasil",
-            "valor": 1,                # cada marca = 1 unidade
-            "tipo": "marcas_veiculos"  # quantidade de marcas
-        })
-
-    df = pd.DataFrame(rows)
-    df = df.groupby(["ano", "regiao", "tipo"])["valor"].sum().reset_index()
-
-    return df
-
-
-# ============================================================
-# ETL FINAL COM CACHE
-# ============================================================
-
-@st.cache_data(ttl=3600)
-def run_etl():
-    st.info("🔄 Carregando dados econômicos, clima e FIPE...")
-
-    df_econ = fetch_economia_worldbank()
-    df_clima = fetch_clima_openmeteo()
-    df_fipe  = fetch_fipe_marcas()
-
-    df = pd.concat([df_econ, df_clima, df_fipe], ignore_index=True)
-    df = df.sort_values("ano").reset_index(drop=True)
-
-    st.success("✔ Dados carregados com sucesso!")
     return df
