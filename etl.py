@@ -1,6 +1,8 @@
 import pandas as pd
 import requests
 import streamlit as st
+from datetime import datetime
+
 
 # ============================================================
 # SAFE REQUEST
@@ -17,99 +19,119 @@ def safe_get(url, params=None):
 
 
 # ============================================================
-# 1) DESEMPREGO – IBGE (FUNCIONA)
+# 1) WORLD BANK — ECONOMIA REAL
+# PIB, desemprego e população
 # ============================================================
 
-def fetch_desemprego_api():
-    url = "https://servicodados.ibge.gov.br/api/v1/paises/BR/indicadores/4716"
-    data = safe_get(url)
+def fetch_worldbank_indicator(country: str, indicator: str, tipo: str):
+    """
+    country = 'BRA'
+    indicator = códigos World Bank (ex: SL.UEM.TOTL.ZS)
+    tipo = nome do indicador no dataframe final
+    """
+    url = f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}?format=json"
 
+    data = safe_get(url)
+    if not data or len(data) < 2:
+        return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
+
+    rows = []
+    for item in data[1]:  
+        if item["value"] is None:
+            continue
+        rows.append({
+            "ano": int(item["date"]),
+            "regiao": country,
+            "valor": float(item["value"]),
+            "tipo": tipo
+        })
+
+    return pd.DataFrame(rows)
+
+
+def fetch_economia_worldbank():
+    df1 = fetch_worldbank_indicator("BRA", "NY.GDP.MKTP.CD", "pib")
+    df2 = fetch_worldbank_indicator("BRA", "SL.UEM.TOTL.ZS", "desemprego")
+    df3 = fetch_worldbank_indicator("BRA", "SP.POP.TOTL", "populacao")
+    return pd.concat([df1, df2, df3], ignore_index=True)
+
+
+# ============================================================
+# 2) OPEN-METEO — CLIMA REAL
+# Temperatura média diária em SP
+# ============================================================
+
+def fetch_clima_openmeteo():
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        "?latitude=-23.55&longitude=-46.63"
+        "&daily=temperature_2m_max,temperature_2m_min"
+        "&timezone=America%2FSao_Paulo"
+    )
+
+    data = safe_get(url)
     if not data:
         return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
 
-    serie = data[0]["series"][0]["serie"]
+    datas = data["daily"]["time"]
+    temp_max = data["daily"]["temperature_2m_max"]
 
     rows = []
-    for ano, valor in serie.items():
+    for d, t in zip(datas, temp_max):
+        ano = int(d.split("-")[0])
         rows.append({
-            "ano": int(ano),
-            "regiao": "Brasil",
-            "valor": float(valor.replace(",", ".")),
-            "tipo": "desemprego"
+            "ano": ano,
+            "regiao": "SP",
+            "valor": float(t),
+            "tipo": "temperatura_max"
         })
 
     return pd.DataFrame(rows)
 
 
 # ============================================================
-# 2) SAÚDE – Brasil.IO (FUNCIONA)
-# Estabelecimentos por município/UF
+# 3) FIPEAPI — Veículos
+# Marcas de carros e quantidade
 # ============================================================
 
-def fetch_saude_api():
-    url = "https://brasil.io/api/dataset/cnes/estabelecimentos/data/"
+def fetch_fipe_marcas():
+    url = "https://parallelum.com.br/fipe/api/v1/carros/marcas"
     data = safe_get(url)
 
-    if not data or "results" not in data:
+    if not data:
         return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
 
-    df = pd.DataFrame(data["results"])
+    ano_atual = datetime.now().year
 
-    # Campos podem variar → normalização
-    if "estado_sigla" not in df:
-        return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
+    rows = []
+    for item in data:
+        rows.append({
+            "ano": ano_atual,
+            "regiao": "Brasil",
+            "valor": 1,                # cada marca = 1 unidade
+            "tipo": "marcas_veiculos"  # quantidade de marcas
+        })
 
-    df["regiao"] = df["estado_sigla"]
-    df["ano"] = 2024
-    df["valor"] = 1
-
-    df = df.groupby(["regiao", "ano"])["valor"].sum().reset_index()
-    df["tipo"] = "saude"
+    df = pd.DataFrame(rows)
+    df = df.groupby(["ano", "regiao", "tipo"])["valor"].sum().reset_index()
 
     return df
 
 
 # ============================================================
-# 3) INVESTIMENTOS – Tesouro Nacional (FUNCIONA)
-# Execução orçamentária por ano
-# ============================================================
-
-def fetch_investimentos_api():
-    url = "https://apidatalake.tesouro.gov.br/ords/siconfi/tt/resultados"
-    params = {"size": 2000}
-
-    data = safe_get(url, params)
-    if not data or "items" not in data:
-        return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
-
-    df = pd.DataFrame(data["items"])
-
-    # Normaliza os campos relevantes
-    if "ano" not in df or "valor" not in df:
-        return pd.DataFrame(columns=["ano", "regiao", "valor", "tipo"])
-
-    df = df[["ano", "valor"]]
-    df["regiao"] = "Brasil"
-    df["tipo"] = "investimentos"
-
-    return df
-
-
-# ============================================================
-# ETL FINAL – COM CACHE
+# ETL FINAL COM CACHE
 # ============================================================
 
 @st.cache_data(ttl=3600)
 def run_etl():
-    st.info("Carregando dados das APIs públicas...")
+    st.info("🔄 Carregando dados econômicos, clima e FIPE...")
 
-    df1 = fetch_desemprego_api()
-    df2 = fetch_saude_api()
-    df3 = fetch_investimentos_api()
+    df_econ = fetch_economia_worldbank()
+    df_clima = fetch_clima_openmeteo()
+    df_fipe  = fetch_fipe_marcas()
 
-    df = pd.concat([df1, df2, df3], ignore_index=True)
-    df["ano"] = df["ano"].astype(int)
-    df = df.sort_values("ano")
+    df = pd.concat([df_econ, df_clima, df_fipe], ignore_index=True)
+    df = df.sort_values("ano").reset_index(drop=True)
 
-    st.success("Dados carregados com sucesso!")
+    st.success("✔ Dados carregados com sucesso!")
     return df
