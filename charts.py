@@ -1,44 +1,120 @@
 import plotly.express as px
 import pandas as pd
 
-def chart_desemprego(df: pd.DataFrame):
-    df = df[df["tipo"] == "desemprego"]
+
+# ============================================================
+# 1) Desemprego Global – Linha temporal
+# ============================================================
+
+def chart_desemprego_global(df: pd.DataFrame):
+    data = df[df["tipo"] == "desemprego_global"]
 
     fig = px.line(
-        df,
+        data,
         x="ano",
         y="valor",
         color="regiao",
-        markers=True,
-        title="Unemployment Trend"
+        title="Taxa de Desemprego Global (%)",
+        markers=True
     )
-    fig.update_layout(template="plotly_white")
+
+    fig.update_layout(
+        template="plotly_white",
+        legend_title="País",
+        yaxis_title="Percentual (%)"
+    )
+
     return fig
 
 
-def chart_saude(df: pd.DataFrame):
-    df = df[df["tipo"] == "saude"]
+# ============================================================
+# 2) Saúde Global – Gasto em Saúde (% do PIB)
+# ============================================================
+
+def chart_saude_global(df: pd.DataFrame):
+    data = df[df["tipo"] == "saude_global"]
+
+    # Exibir apenas 20 países para não poluir o gráfico
+    top_paises = (
+        data.groupby("regiao")["valor"]
+        .mean()
+        .sort_values(ascending=False)
+        .head(20)
+        .index
+    )
+
+    data = data[data["regiao"].isin(top_paises)]
 
     fig = px.bar(
-        df,
+        data,
+        x="regiao",
+        y="valor",
+        title="Gasto em Saúde (% do PIB) – Top 20 Países",
+        color="regiao"
+    )
+
+    fig.update_layout(
+        template="plotly_white",
+        showlegend=False,
+        xaxis_title="País",
+        yaxis_title="% do PIB"
+    )
+
+    return fig
+
+
+# ============================================================
+# 3) Investimentos Globais – Linha temporal
+# ============================================================
+
+def chart_investimentos_global(df: pd.DataFrame):
+    data = df[df["tipo"] == "investimento_global"]
+
+    fig = px.line(
+        data,
+        x="ano",
+        y="valor",
+        color="regiao",
+        title="Formação Bruta de Capital (% do PIB) – Investimentos Globais",
+        markers=True
+    )
+
+    fig.update_layout(
+        template="plotly_white",
+        legend_title="País",
+        yaxis_title="% do PIB"
+    )
+
+    return fig
+
+
+# ============================================================
+# 4) Ranking – Comparativo rápido de ano específico
+# ============================================================
+
+def chart_ranking(df: pd.DataFrame, tipo: str, ano: int):
+    """
+    Gera ranking de qualquer indicador global em um ano específico.
+    Exemplo:
+    chart_ranking(df, "desemprego_global", 2020)
+    """
+
+    data = df[(df["tipo"] == tipo) & (df["ano"] == ano)]
+    data = data.sort_values("valor", ascending=False).head(20)
+
+    fig = px.bar(
+        data,
         x="regiao",
         y="valor",
         color="regiao",
-        title="Regional Unemployment"
+        title=f"Ranking {tipo.replace('_', ' ').title()} – {ano}"
     )
-    fig.update_layout(template="plotly_white", showlegend=False)
-    return fig
 
-
-def chart_investimentos(df: pd.DataFrame):
-    df = df[df["tipo"] == "investimentos"]
-
-    fig = px.line(
-        df,
-        x="regiao",
-        y="valor",
-        markers=True,
-        title="Prediction"
+    fig.update_layout(
+        template="plotly_white",
+        showlegend=False,
+        xaxis_title="País",
+        yaxis_title="Valor"
     )
-    fig.update_layout(template="plotly_white")
+
     return fig
