@@ -1,4 +1,4 @@
-# IntegraHub – MVP Streamlit (24 horas)
+# IntegraHub – MVP Streamlit
 
 Projeto totalmente executável no Streamlit Cloud ou localmente.
 
