@@ -118,3 +118,29 @@ def chart_ranking(df: pd.DataFrame, tipo: str, ano: int):
     )
 
     return fig
+
+import plotly.express as px
+
+def chart_compare(df, tipo):
+    df_tipo = df[df["tipo"] == tipo]
+
+    if df_tipo.empty:
+        return px.line(title="Sem dados suficientes")
+
+    fig = px.line(
+        df_tipo,
+        x="ano",
+        y="valor",
+        color="regiao",
+        markers=True,
+        line_shape="spline",
+        title=""
+    )
+
+    fig.update_layout(
+        height=350,
+        legend_title_text="País",
+        margin=dict(l=20, r=20, t=40, b=20),
+    )
+
+    return fig

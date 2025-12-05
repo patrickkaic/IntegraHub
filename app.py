@@ -49,7 +49,6 @@ h3 {
     box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
-/* Ícone do card */
 .card-icon {
     background: #E9EDFA;
     padding: 16px;
@@ -74,7 +73,7 @@ h3 {
     color: #111827;
 }
 
-/* Subtítulos de seção */
+/* Seções */
 .section-title {
     font-size: 22px;
     font-weight: 700;
@@ -84,7 +83,7 @@ h3 {
     padding-left: 10px;
 }
 
-/* Separador elegante */
+/* Linha divisória */
 .divider {
     height: 1px;
     background: linear-gradient(to right, #D1D5DB, #F3F4F6);
@@ -108,16 +107,16 @@ st.markdown("""
 
 
 # ============================================================
-# CARREGAMENTO DOS DADOS
+# ETL
 # ============================================================
 
 df = run_etl()
 
-# Lista de países dinâmica
+# Lista de países
 paises = sorted(df["regiao"].unique()) if not df.empty else []
 paises = ["Todos"] + paises
 
-selected_country = st.selectbox("Selecione um país:", paises)
+selected_country = st.selectbox("Selecione um país (modo simples):", paises)
 
 if selected_country != "Todos":
     df_filtered = df[df["regiao"] == selected_country]
@@ -126,7 +125,7 @@ else:
 
 
 # ============================================================
-# CÁLCULO DOS KPIs
+# KPI CARDS
 # ============================================================
 
 desemp = df_filtered[df_filtered["tipo"] == "desemprego_global"]["valor"].mean()
@@ -138,45 +137,33 @@ colA, colB, colC = st.columns(3)
 with colA:
     st.markdown(f"""
     <div class="card">
-        <div class="card-icon">
-            <img src="https://img.icons8.com/ios-filled/50/3563E9/combo-chart.png" width="26">
-        </div>
-        <div>
-            <div class="card-title">Desemprego Médio</div>
-            <div class="card-value">{desemp:.2f}%</div>
-        </div>
+        <div class="card-icon"><img src="https://img.icons8.com/ios-filled/50/3563E9/combo-chart.png" width="26"></div>
+        <div><div class="card-title">Desemprego Médio</div>
+        <div class="card-value">{desemp:.2f}%</div></div>
     </div>
     """, unsafe_allow_html=True)
 
 with colB:
     st.markdown(f"""
     <div class="card">
-        <div class="card-icon">
-            <img src="https://img.icons8.com/ios-filled/50/3563E9/healthy-food.png" width="26">
-        </div>
-        <div>
-            <div class="card-title">Gasto em Saúde</div>
-            <div class="card-value">{saude:.2f}%</div>
-        </div>
+        <div class="card-icon"><img src="https://img.icons8.com/ios-filled/50/3563E9/healthy-food.png" width="26"></div>
+        <div><div class="card-title">Gasto em Saúde</div>
+        <div class="card-value">{saude:.2f}%</div></div>
     </div>
     """, unsafe_allow_html=True)
 
 with colC:
     st.markdown(f"""
     <div class="card">
-        <div class="card-icon">
-            <img src="https://img.icons8.com/ios-filled/50/3563E9/money-bag.png" width="26">
-        </div>
-        <div>
-            <div class="card-title">Investimentos</div>
-            <div class="card-value">{invest:.2f}%</div>
-        </div>
+        <div class="card-icon"><img src="https://img.icons8.com/ios-filled/50/3563E9/money-bag.png" width="26"></div>
+        <div><div class="card-title">Investimentos</div>
+        <div class="card-value">{invest:.2f}%</div></div>
     </div>
     """, unsafe_allow_html=True)
 
 
 # ============================================================
-# SEÇÃO DE GRÁFICOS
+# GRÁFICOS PRINCIPAIS
 # ============================================================
 
 st.markdown("<div class='section-title'>Visualização Global</div>", unsafe_allow_html=True)
@@ -184,35 +171,76 @@ st.markdown("<div class='section-title'>Visualização Global</div>", unsafe_all
 c1, c2, c3 = st.columns(3)
 
 with c1:
-    st.markdown("##### Tendência Global de Desemprego")
+    st.markdown("##### Tendência de Desemprego")
     st.plotly_chart(charts.chart_desemprego_global(df_filtered), use_container_width=True)
 
 with c2:
-    st.markdown("##### Gasto Global em Saúde")
+    st.markdown("##### Gasto em Saúde")
     st.plotly_chart(charts.chart_saude_global(df_filtered), use_container_width=True)
 
 with c3:
-    st.markdown("##### Tendência Global de Investimentos")
+    st.markdown("##### Investimentos")
     st.plotly_chart(charts.chart_investimentos_global(df_filtered), use_container_width=True)
 
 
 # ============================================================
-# SEÇÃO DE RANKING
+#  NOVA SEÇÃO: COMPARAÇÃO ENTRE PAÍSES
+# ============================================================
+
+st.markdown("<div class='section-title'>Comparação Entre Países</div>", unsafe_allow_html=True)
+st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
+
+# MULTISELECT
+paises_multi = st.multiselect(
+    "Selecione países para comparar:",
+    options=sorted(df["regiao"].unique()),
+    default=["Brazil", "Argentina", "Chile"]
+)
+
+df_compare = df[df["regiao"].isin(paises_multi)]
+
+if df_compare.empty:
+    st.warning("Selecione ao menos 1 país para comparar.")
+    st.stop()
+
+# ===== Gráficos comparativos =====
+
+st.markdown("#### Desemprego (%)")
+st.plotly_chart(charts.chart_compare(df_compare, "desemprego_global"), use_container_width=True)
+
+st.markdown("#### Gasto em Saúde (% do PIB)")
+st.plotly_chart(charts.chart_compare(df_compare, "saude_global"), use_container_width=True)
+
+st.markdown("#### Investimentos (% do PIB)")
+st.plotly_chart(charts.chart_compare(df_compare, "investimento_global"), use_container_width=True)
+
+# ===== Tabela comparativa do último ano =====
+
+st.markdown("#### Comparativo no Ano Mais Recente")
+
+ano_ref = df["ano"].max()
+
+df_summary = (
+    df_compare[df_compare["ano"] == ano_ref]
+    .pivot_table(index="regiao", columns="tipo", values="valor")
+)
+
+st.dataframe(df_summary, use_container_width=True)
+
+
+# ============================================================
+# RANKING GLOBAL POR ANO
 # ============================================================
 
 st.markdown("<div class='section-title'>Ranking Global por Ano</div>", unsafe_allow_html=True)
 st.markdown("<div class='divider'></div>", unsafe_allow_html=True)
 
-# Segurança contra DF vazio
-if df.empty or "ano" not in df.columns or df["ano"].dropna().empty:
-    st.error("Nenhum dado disponível para montar o ranking. Verifique se as APIs retornaram dados.")
+if df.empty or df["ano"].dropna().empty:
+    st.error("Sem dados para ranking.")
     st.stop()
 
-ano_min_real = df["ano"].dropna().min()
-ano_max_real = df["ano"].dropna().max()
-
-ano_min = int(ano_min_real)
-ano_max = int(ano_max_real)
+ano_min = int(df["ano"].min())
+ano_max = int(df["ano"].max())
 
 selected_year = st.slider("Selecione um ano:", ano_min, ano_max, ano_max)
 
