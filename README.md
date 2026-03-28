@@ -1,4 +1,4 @@
-IntegraHub Dashboard
+## IntegraHub Dashboard
 
 Dashboard interativo de indicadores econômicos globais com foco em análise de dados, visualização e pipeline ETL.
 
